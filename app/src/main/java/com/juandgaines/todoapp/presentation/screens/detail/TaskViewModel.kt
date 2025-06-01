@@ -1,5 +1,6 @@
 package com.juandgaines.todoapp.presentation.screens.detail
 
+import TaskScreenState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,79 +24,82 @@ import javax.inject.Inject
 
 @HiltViewModel
 class TaskViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
-    private val localDataSource: TaskLocalDataSource
-): ViewModel() {
+    saveStateHandle: SavedStateHandle,
+    private val taskLocalDataSource: TaskLocalDataSource
+) : ViewModel() {
 
+    private val taskData = saveStateHandle.toRoute<TaskScreenDes>()
 
     var state by mutableStateOf(TaskScreenState())
         private set
 
-    private var eventChannel = Channel<TaskEvent>()
-
-    val event = eventChannel.receiveAsFlow()
+    private val eventsChannel = Channel<TaskEvent>()
+    val events = eventsChannel.receiveAsFlow()
     private val canSaveTask = snapshotFlow { state.taskName.text.toString() }
-    private val taskData= savedStateHandle.toRoute<TaskScreenDes>()
 
-    private var editedTask: Task? = null
+    private var editableTask: Task? = null
 
     init {
-
         taskData.taskId?.let {
             viewModelScope.launch {
-                localDataSource.getTaskById(taskData.taskId)?.let { task ->
-                    editedTask= task
+                taskLocalDataSource.getTaskById(taskData.taskId)?.let { task ->
+                    editableTask = task
                     state = state.copy(
-                        taskName = TextFieldState(task.title),
-                        taskDescription = TextFieldState(task.description?:""),
-                        isTaskDone = task.isCompleted,
-                        category = task.category
+                        taskName = TextFieldState(task?.title ?: ""),
+                        taskDescription = TextFieldState(task?.desc ?: ""),
+                        category = task?.category,
+                        isTaskDone = task?.isCompleted ?: false
                     )
                 }
             }
         }
-
         canSaveTask.onEach {
-            state = state.copy(canSaveTask = it.isNotEmpty())
+            state = state.copy(
+                canSaveTask = it.isNotEmpty()
+            )
         }.launchIn(viewModelScope)
     }
 
-    fun onAction(action: ActionTask) {
+    fun onAnction(action: ActionTask) {
         viewModelScope.launch {
             when (action) {
-
-                is ActionTask.ChangeTaskCategory -> {
-                    state = state.copy(category = action.category)
+                is ActionTask.ChangeCategory -> {
+                    state = state.copy(
+                        category = action.category
+                    )
                 }
+
                 is ActionTask.ChangeTaskDone -> {
-                    state = state.copy(isTaskDone = action.isTaskDone)
+                    state = state.copy(
+                        isTaskDone = action.done
+                    )
                 }
-                is ActionTask.SaveTask -> {
 
-                    editedTask?.let {
-                        this@TaskViewModel.localDataSource.updateTask(
-                             updatedTask= it.copy(
-                                 id = it.id,
+                ActionTask.SaveTask -> {
+                    editableTask?.let {
+                        taskLocalDataSource.updateTask(
+                            task = it.copy(
+                                id = it.id,
                                 title = state.taskName.text.toString(),
-                                description = state.taskDescription.text.toString(),
-                                isCompleted = state.isTaskDone,
-                                category = state.category
+                                desc = state.taskDescription.text.toString(),
+                                category = state.category,
+                                isCompleted = state.isTaskDone
                             )
                         )
-                    }?:run {
-                        val task= Task(
-                            id =UUID.randomUUID().toString(),
+                    } ?: run {
+                        val task = Task(
+                            id = UUID.randomUUID().toString(),
                             title = state.taskName.text.toString(),
-                            description = state.taskDescription.text.toString(),
-                            isCompleted = state.isTaskDone,
-                            category = state.category
+                            desc = state.taskDescription.text.toString(),
+                            category = state.category,
+                            isCompleted = state.isTaskDone
                         )
-                        localDataSource.addTask(
-                            task = task
-                        )
+                        taskLocalDataSource.addTask(task)
                     }
-                    eventChannel.send(TaskEvent.TaskCreated)
+                    eventsChannel.send(TaskEvent.TaskSave)
+
                 }
+
                 else -> Unit
             }
         }

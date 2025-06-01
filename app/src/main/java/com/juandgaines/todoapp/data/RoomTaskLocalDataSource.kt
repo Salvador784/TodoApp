@@ -12,34 +12,37 @@ import javax.inject.Inject
 
 class RoomTaskLocalDataSource @Inject constructor(
     private val taskDao: TaskDao,
-    private val dispatcherIO: CoroutineDispatcher = Dispatchers.IO
-):TaskLocalDataSource {
-    override val tasksFlow: Flow<List<Task>>
+    private val dispacherIO: CoroutineDispatcher = Dispatchers.IO,
+) : TaskLocalDataSource {
+    override val taskFlow: Flow<List<Task>>
         get() = taskDao.getAllTasks().map {
-            it.map { taskEntity -> taskEntity.toTask() }
-        }.flowOn(dispatcherIO)
+            it.map { taskEntity ->
+                taskEntity.toTask()
+            }
+        }.flowOn(dispacherIO)
 
-    override suspend fun addTask(task: Task) = withContext(dispatcherIO) {
+    override suspend fun addTask(task: Task) = withContext(dispacherIO){
         taskDao.upsertTask(TaskEntity.fromTask(task))
     }
 
-    override suspend fun updateTask(updatedTask: Task) = withContext(dispatcherIO) {
-        taskDao.upsertTask(TaskEntity.fromTask(updatedTask))
+    override suspend fun getTasks(): List<Task> {
+        TODO("Not yet implemented")
     }
 
-    override suspend fun removeTask(task: Task) = withContext(dispatcherIO) {
+    override suspend fun updateTask(task: Task) = withContext(dispacherIO){
+        taskDao.upsertTask(TaskEntity.fromTask(task))
+    }
+
+    override suspend fun deleteTask(task: Task) = withContext(dispacherIO){
         taskDao.deleteTaskById(task.id)
     }
 
-    override suspend fun deleteAllTasks() = withContext(dispatcherIO) {
+    override suspend fun deleteAllTasks() =withContext(dispacherIO){
         taskDao.deleteAllTasks()
     }
 
-    override suspend fun getTaskById(taskId: String): Task? = withContext(dispatcherIO) {
-       taskDao.getTaskById(taskId)?.toTask()
+    override suspend fun getTaskById(taskId: String): Task? = withContext(dispacherIO) {
+        taskDao.getTaskById(taskId)?.toTask()
     }
 
-    override suspend fun removeAllTasks() = withContext(dispatcherIO){
-        taskDao.deleteAllTasks()
-    }
 }

@@ -1,10 +1,7 @@
-package com.juandgaines.todoapp.data.di
+package com.juandgaines.todoapp.data
 
 import android.content.Context
 import androidx.room.Room
-import com.juandgaines.todoapp.data.RoomTaskLocalDataSource
-import com.juandgaines.todoapp.data.TaskDao
-import com.juandgaines.todoapp.data.TodoDatabase
 import com.juandgaines.todoapp.domain.TaskLocalDataSource
 import dagger.Module
 import dagger.Provides
@@ -18,14 +15,10 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 class DataModule {
-
     @Provides
     @Singleton
-    fun provideDataBase(
-        @ApplicationContext
-        context:Context
-    ): TodoDatabase {
-        return Room.databaseBuilder(
+    fun providesDatabase(@ApplicationContext context: Context):TodoDatabase {
+        return  Room.databaseBuilder(
             context.applicationContext,
             TodoDatabase::class.java,
             "task_database"
@@ -34,19 +27,15 @@ class DataModule {
 
     @Provides
     @Singleton
-    fun provideTaskDao(
-        database: TodoDatabase
-    ): TaskDao {
-        return database.taskDao()
-    }
+    fun providesTaskDao(
+        todoDatabase: TodoDatabase
+    ):TaskDao = todoDatabase.taskDao()
 
     @Provides
     @Singleton
     fun provideTaskLocalDataSource(
         taskDao: TaskDao,
         @Named("dispatcherIO")
-        dispatcherIO: CoroutineDispatcher
-    ): TaskLocalDataSource {
-        return RoomTaskLocalDataSource(taskDao, dispatcherIO)
-    }
+        dispatcher: CoroutineDispatcher
+    ):TaskLocalDataSource = RoomTaskLocalDataSource(taskDao)
 }

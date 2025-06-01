@@ -14,40 +14,37 @@ data class TaskEntity(
     @PrimaryKey(autoGenerate = false)
     val id: String,
     val title: String,
-    val description: String?,
-    val category: Int?,
+    val description: String,
     @ColumnInfo(name = "is_completed")
     val isCompleted: Boolean,
     val date: Long,
+    val category: Int?
 ) {
+    fun toTask(): Task {
+        return Task(
+            id = id,
+            title = title,
+            desc = description,
+            isCompleted = isCompleted,
+            category = category?.let {
+                Category.fromOrdinal(it)
+            },
+            date = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(date),
+                ZoneId.systemDefault()
+            ),
+        )
+    }
     companion object {
         fun fromTask(task: Task): TaskEntity {
             return TaskEntity(
                 id = task.id,
                 title = task.title,
-                description = task.description,
+                description = task.desc!!,
                 isCompleted = task.isCompleted,
-                category = task.category?.ordinal,
-                date = task.date
-                    .atZone(
-                        ZoneId.systemDefault()
-                    ).toInstant()
-                    .toEpochMilli(),
+                date = task.date.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                category = task.category?.ordinal
             )
         }
-    }
-
-    fun toTask(): Task {
-        return Task(
-            id = id,
-            title = title,
-            description = description,
-            isCompleted = isCompleted,
-            category = category?.let { Category.fromOrdinal(it) },
-            date = LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(date),
-                ZoneId.systemDefault()
-            )
-        )
     }
 }

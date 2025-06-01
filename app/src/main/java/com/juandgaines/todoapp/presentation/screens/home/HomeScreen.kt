@@ -1,4 +1,7 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(
+    ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class
+)
 
 package com.juandgaines.todoapp.presentation.screens.home
 
@@ -31,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -40,63 +44,73 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import com.juandgaines.todoapp.R
-import com.juandgaines.todoapp.presentation.screens.home.components.SectionTitle
-import com.juandgaines.todoapp.presentation.screens.home.components.SummaryInfo
-import com.juandgaines.todoapp.presentation.screens.home.components.TaskItem
-import com.juandgaines.todoapp.presentation.screens.home.providers.HomeScreenPreviewProvider
-import com.juandgaines.todoapp.ui.theme.TodoAppTheme
+import com.juandgaines.todoapp.presentation.screens.home.providers.HomeScreenProvider
+import com.juandgaines.todoapp.ui.theme.AppTheme
 
 @Composable
 fun HomeScreenRoot(
-    navigateToTaskScreen: (String?) -> Unit,
-    viewModel:HomeScreenViewModel
+    navigateToTaskScren: (
+        String?,
+    ) -> Unit,
+    viewModel: HomeScreenViewModel
 ) {
     val state = viewModel.state
     val event = viewModel.events
+
     val context = LocalContext.current
 
-    LaunchedEffect(
-        true
-    ) {
-        event.collect{ event->
-            when(event){
-                HomeScreenEvent.DeletedTask -> {
-                    Toast.makeText(context, context.getString(R.string.task_deleted), Toast.LENGTH_SHORT).show()
-                }
-                HomeScreenEvent.AllTaskDeleted->{
-                    Toast.makeText(context, context.getString(R.string.all_task_deleted), Toast.LENGTH_SHORT).show()
-                }
-                HomeScreenEvent.UpdatedTask -> {
-                    Toast.makeText(context, context.getString(R.string.task_updated), Toast.LENGTH_SHORT).show()
-                }
+    LaunchedEffect(true) {
+        event.collect { e ->
+            when (e) {
+                HomeScreenEvent.TaskAllDeleted -> Toast.makeText(
+                    context,
+                    context.getString(R.string.all_task_deleted),
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                HomeScreenEvent.TaskDeleted -> Toast.makeText(
+                    context,
+                    context.getString(R.string.task_deleted),
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                HomeScreenEvent.UpdatedTask -> Toast.makeText(
+                    context,
+                    context.getString(R.string.task_updated),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
+
     HomeScreen(
         state = state,
         onAction = { action ->
-            when(action){
-                is HomeScreenAction.OnAddTask->{
-                    navigateToTaskScreen(null)
+            when (action) {
+                HomeScreenAction.OnAddTask -> {
+                    navigateToTaskScren(null)
                 }
-                is HomeScreenAction.OnClickTask->{
-                    navigateToTaskScreen(action.taskId)
+                is HomeScreenAction.OnClickTask ->{
+                    navigateToTaskScren(action.taskId)
                 }
-                else -> viewModel.onAction(action)
+
+                else -> {
+                    viewModel.onAction(action)
+                }
             }
         }
     )
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
     state: HomeDataState,
-    onAction: (HomeScreenAction) -> Unit
+    onAction: (HomeScreenAction) -> Unit,
+    navigateToEditScreen: (String) -> Unit = {}
 ) {
-    var isMenuExtended by remember { mutableStateOf(false) }
-
+    var isExpanded by remember { mutableStateOf(false) }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -109,144 +123,138 @@ fun HomeScreen(
                     )
                 },
                 actions = {
-                    Box (
-                        modifier= Modifier
+                    Box(
+                        modifier = Modifier
                             .padding(8.dp)
                             .clickable {
-                                isMenuExtended = true
+                                isExpanded = true
                             }
-                    ){
+                    ) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "Add Task",
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                         DropdownMenu(
-                            expanded = isMenuExtended,
+                            expanded = isExpanded,
                             modifier = Modifier.background(
                                 color = MaterialTheme.colorScheme.surfaceContainerHighest
                             ),
-                            onDismissRequest = { isMenuExtended = false }
+                            onDismissRequest = { isExpanded = false }
                         ) {
                             DropdownMenuItem(
-                                text ={
+                                text = {
                                     Text(
-                                        text =stringResource(R.string.delete_all),
+                                        stringResource(R.string.delete_all),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 },
                                 onClick = {
-                                    isMenuExtended = false
+                                    isExpanded = false
                                     onAction(HomeScreenAction.OnDeleteAllTasks)
                                 }
                             )
                         }
                     }
                 }
-
             )
         },
         content = { paddingValues ->
 
-            if (state.completedTask.isEmpty() && state.pendingTask.isEmpty()){
+            if (state.pendingTasks.isEmpty() && state.completedTasks.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = androidx.compose.ui.Alignment.Center
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
                 ){
-                    Text(
-                        text = stringResource(R.string.no_tasks),
+                    Text(stringResource(R.string.no_tasks),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
             }
-            else {
-                LazyColumn(
-                    modifier = Modifier
-                        .padding(paddingValues = paddingValues)
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(
-                        8.dp
+            LazyColumn(
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+
+            ) {
+                item {
+                    SummaryInfo(
+                        date = state.date.toString(),
+                        taskSummary = state.summary.toString(),
+                        completedTasks = state.completedTasks.size,
+                        totalTask = state.pendingTasks.size + state.completedTasks.size
                     )
-                ) {
-                    item {
-                        SummaryInfo(
-                            date = state.date,
-                            tasksSummary = stringResource(R.string.summary, state.summary),
-                            completedTasks = state.completedTask.size,
-                            totalTask = state.completedTask.size + state.pendingTask.size
-                        )
-                    }
-
-                    stickyHeader {
-                        SectionTitle(
-                            modifier = Modifier
-                                .background(
-                                    color = MaterialTheme.colorScheme.surface
-                                )
-                                .fillParentMaxWidth(),
-                            title = stringResource(R.string.pending_tasks)
-                        )
-                    }
-
-                    items(
-                        items = state.pendingTask,
-                        key = { task -> task.id }
-                    ) { task ->
-                        TaskItem(
-                            modifier = Modifier
-                                .clip(
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .animateItem(),
-                            task = task,
-                            onClickItem = {
-                                onAction(HomeScreenAction.OnClickTask(task.id))
-                            },
-                            onDeleteItem = {
-                                onAction(HomeScreenAction.OnDeleteTask(task))
-                            },
-                            onToggleCompletion = {
-                                onAction(HomeScreenAction.OnToggleTask(it))
-                            }
-                        )
-                    }
-
-                    stickyHeader {
-                        SectionTitle(
-                            modifier = Modifier
-                                .fillParentMaxWidth()
-                                .background(
-                                    color = MaterialTheme.colorScheme.surface
-                                ),
-                            title = stringResource(R.string.completed_tasks)
-                        )
-                    }
-
-                    items(
-                        items = state.completedTask,
-                        key = { task -> task.id }
-                    ) { task ->
-                        TaskItem(
-                            modifier = Modifier
-                                .clip(
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .animateItem(),
-                            task = task,
-                            onClickItem = {
-                                onAction(HomeScreenAction.OnClickTask(task.id))
-                            },
-                            onDeleteItem = {
-                                onAction(HomeScreenAction.OnDeleteTask(task))
-                            },
-                            onToggleCompletion = {
-                                onAction(HomeScreenAction.OnToggleTask(it))
-                            }
-                        )
-                    }
-
                 }
+                // tareas Pendientes
+                stickyHeader {
+                    SectionTitle(
+                        modifier = Modifier
+                            .fillParentMaxWidth()
+                            .background(
+                                color = MaterialTheme.colorScheme.surface
+                            ),
+                        title = stringResource(R.string.pending_tasks)
+                    )
+                }
+                items(
+                    state.pendingTasks,
+                    key = { task -> task.id }
+                ) { task ->
+                    TaskItem(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .animateItem(),
+                        onToggleCompleted = {
+                            onAction(HomeScreenAction.OnToggleTask(it))
+                        },
+                        onDeleteClick = {
+                            onAction(HomeScreenAction.OnDeleteTask(task))
+                        },
+                        onClickItem = {
+                            onAction(HomeScreenAction.OnClickTask(task.id))
+                        },
+                        task = task
+                    )
+                }
+
+
+                // tareas Completadas
+                stickyHeader {
+                    SectionTitle(
+                        modifier = Modifier
+                            .fillParentMaxWidth()
+                            .background(
+                                color = MaterialTheme.colorScheme.surface
+                            ),
+                        title = stringResource(R.string.completed_tasks)
+                    )
+                }
+                items(
+                    state.completedTasks,
+                    key = { task -> task.id }
+                ) { task ->
+                    TaskItem(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .animateItem(),
+                        onToggleCompleted = {
+                            onAction(HomeScreenAction.OnToggleTask(it))
+                        },
+                        onDeleteClick = {
+                            onAction(HomeScreenAction.OnDeleteTask(task))
+                        },
+                        onClickItem = {
+                            onAction(HomeScreenAction.OnClickTask(task.id))
+                        },
+                        task = task
+                    )
+                }
+
             }
         },
         floatingActionButton = {
@@ -255,18 +263,23 @@ fun HomeScreen(
                     onAction(HomeScreenAction.OnAddTask)
                 }
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Add Task")
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     )
 }
 
+
 @Preview
 @Composable
 fun HomeScreenPreviewLight(
-    @PreviewParameter(HomeScreenPreviewProvider::class) state: HomeDataState
+    @PreviewParameter(HomeScreenProvider::class) state: HomeDataState,
 ) {
-    TodoAppTheme {
+    AppTheme {
         HomeScreen(
             state = state,
             onAction = {}
@@ -280,11 +293,11 @@ fun HomeScreenPreviewLight(
 )
 @Composable
 fun HomeScreenPreviewDark(
-    @PreviewParameter(HomeScreenPreviewProvider::class) state: HomeDataState
+    @PreviewParameter(HomeScreenProvider::class) state: HomeDataState,
 ) {
-    TodoAppTheme {
+    AppTheme {
         HomeScreen(
-            state= state,
+            state = state,
             onAction = {}
         )
     }

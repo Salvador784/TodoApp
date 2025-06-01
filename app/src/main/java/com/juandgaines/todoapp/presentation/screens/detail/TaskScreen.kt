@@ -1,6 +1,6 @@
 package com.juandgaines.todoapp.presentation.screens.detail
 
-import android.content.res.Configuration.UI_MODE_NIGHT_YES
+import TaskScreenState
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,7 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -48,57 +48,52 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import com.juandgaines.todoapp.R
 import com.juandgaines.todoapp.domain.Category
-import com.juandgaines.todoapp.presentation.screens.detail.providers.TaskScreenStatePreviewProvider
-import com.juandgaines.todoapp.ui.theme.TodoAppTheme
+import com.juandgaines.todoapp.ui.theme.AppTheme
 
 @Composable
 fun TaskScreenRoot(
-    navigateBack: () -> Boolean,
-    viewModel: TaskViewModel
+    navigateToHomeScreen: () -> Boolean,
+    viewModel: TaskViewModel,
 ) {
     val state = viewModel.state
-    val event = viewModel.event
+    val events = viewModel.events
 
     val context = LocalContext.current
-
     LaunchedEffect(true) {
-        event.collect { event ->
-            when(event){
-                is TaskEvent.TaskCreated -> {
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.task_created),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        navigateBack()
+        events.collect { event ->
+            when (event) {
+                TaskEvent.TaskSave -> {
+                    Toast.makeText(context, context.getString(R.string.save), Toast.LENGTH_SHORT)
+                        .show()
+                    navigateToHomeScreen()
                 }
             }
         }
     }
-
     TaskScreen(
         state = state,
-        onAction = { action ->
-            when(action){
+        onActionTask = { a ->
+            when (a) {
                 is ActionTask.Back -> {
-                    navigateBack()
+                    navigateToHomeScreen()
                 }
+
                 else -> {
-                    viewModel.onAction(action)
+                    viewModel.onAnction(a)
                 }
             }
         }
     )
 }
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskScreen(
     modifier: Modifier = Modifier,
     state: TaskScreenState,
-    onAction: (ActionTask) -> Unit
+    onActionTask: (ActionTask) -> Unit,
 ) {
-
     var isDescriptionFocus by remember {
         mutableStateOf(false)
     }
@@ -106,7 +101,7 @@ fun TaskScreen(
         mutableStateOf(false)
     }
 
-    Scaffold (
+    Scaffold(
         topBar = {
             TopAppBar(
                 title = {
@@ -117,33 +112,30 @@ fun TaskScreen(
                 },
                 navigationIcon = {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onBackground,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.clickable {
-                            onAction(
+                            onActionTask(
                                 ActionTask.Back
                             )
                         }
                     )
-                },
+                }
             )
         }
-    ){ padding->
-        Column (
-            verticalArrangement = Arrangement.spacedBy(
-                8.dp
-            ),
+    ) { padding ->
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp)
-                .imePadding()
-
-        ){
-            Row (
+                .imePadding() // To avoid keyboard overlap
+        ) {
+            Row(
                 verticalAlignment = Alignment.CenterVertically
-            ){
+            ) {
                 Text(
                     text = stringResource(R.string.done),
                     style = MaterialTheme.typography.bodyMedium.copy(
@@ -154,10 +146,8 @@ fun TaskScreen(
                 Checkbox(
                     checked = state.isTaskDone,
                     onCheckedChange = {
-                        onAction(
-                            ActionTask.ChangeTaskDone(
-                                isTaskDone = it
-                            )
+                        onActionTask(
+                            ActionTask.ChangeTaskDone(it)
                         )
                     },
                 )
@@ -170,7 +160,7 @@ fun TaskScreen(
                     modifier = Modifier.clickable {
                         isExpanded = true
                     }
-                ){
+                ) {
 
                     Text(
                         text = state.category?.toString() ?: stringResource(R.string.category),
@@ -185,10 +175,10 @@ fun TaskScreen(
                             )
                             .padding(8.dp)
                     )
-                    Box (
+                    Box(
                         modifier = Modifier.padding(8.dp),
                         contentAlignment = Alignment.Center
-                    ){
+                    ) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
                             contentDescription = "Add Task",
@@ -214,12 +204,10 @@ fun TaskScreen(
                                                 8.dp
                                             )
                                             .clickable {
-                                                isExpanded = false
-                                                onAction(
-                                                    ActionTask.ChangeTaskCategory(
-                                                        category = category
-                                                    )
+                                                onActionTask(
+                                                    ActionTask.ChangeCategory(category)
                                                 )
+                                                isExpanded = false
                                             }
                                     )
                                 }
@@ -227,8 +215,6 @@ fun TaskScreen(
                         }
                     }
                 }
-
-
             }
 
             BasicTextField(
@@ -238,16 +224,15 @@ fun TaskScreen(
                     fontWeight = FontWeight.Bold
                 ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.secondary),
-                lineLimits = TextFieldLineLimits.SingleLine,
+                lineLimits = androidx.compose.foundation.text.input.TextFieldLineLimits.SingleLine,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .wrapContentHeight()
-                ,
-                decorator = { innerTextField ->
-                    Column (
+                    .wrapContentHeight(),
+                decorator = { innerBox ->
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                    ){
-                        if(state.taskName.text.toString().isEmpty()){
+                    ) {
+                        if (state.taskName.text.toString().isEmpty()) {
                             Text(
                                 modifier = Modifier.fillMaxWidth(),
                                 text = stringResource(R.string.task_name),
@@ -258,71 +243,68 @@ fun TaskScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                             )
-                        }
-                        else{
-                            innerTextField()
+                        } else {
+                            innerBox()
                         }
                     }
                 }
             )
             BasicTextField(
                 state = state.taskDescription,
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.secondary),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     color = MaterialTheme.colorScheme.onSurface
                 ),
-                lineLimits = if (isDescriptionFocus)
-                    TextFieldLineLimits.MultiLine(
-                        minHeightInLines = 1,
-                        maxHeightInLines = 5
-                    )
-                else
-                    TextFieldLineLimits.Default,
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.secondary),
+                lineLimits = if (isDescriptionFocus){
+                  TextFieldLineLimits.MultiLine(
+                      minHeightInLines = 5,
+                      maxHeightInLines = 10
+                  )
+                }else{
+                    TextFieldLineLimits.Default
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .wrapContentHeight()
                     .onFocusChanged {
                         isDescriptionFocus = it.isFocused
                     },
-                decorator = { innerTextField ->
+                decorator = { innerBox ->
                     Column {
-                        if(state.taskDescription.text.toString().isEmpty() && !isDescriptionFocus){
+                        if (state.taskDescription.text.toString()
+                                .isNullOrEmpty() && !isDescriptionFocus
+                        ) {
                             Text(
                                 text = stringResource(R.string.task_description),
                                 color = MaterialTheme.colorScheme.onSurface.copy(
                                     alpha = 0.5f
                                 )
                             )
-                        }else{
-                            innerTextField()
+                        } else {
+                            innerBox()
                         }
                     }
-                },
+                }
             )
-
             Spacer(
                 modifier = Modifier.weight(1f)
             )
-
-
             Button(
                 enabled = state.canSaveTask,
                 onClick = {
-                    onAction(
+                    onActionTask(
                         ActionTask.SaveTask
                     )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(46.dp)
-            ){
+            ) {
                 Text(
                     text = stringResource(R.string.save),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (state.canSaveTask)
-                        MaterialTheme.colorScheme.onPrimary
-                    else
-                        MaterialTheme.colorScheme.onPrimaryContainer
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
                 )
             }
         }
@@ -330,29 +312,34 @@ fun TaskScreen(
 }
 
 @Composable
-@Preview
-fun TaskScreenLightPreview(
-    @PreviewParameter(TaskScreenStatePreviewProvider::class) state: TaskScreenState
-){
-    TodoAppTheme {
+@Preview(
+    showBackground = true,
+    showSystemUi = true
+)
+fun TaskScreenPreview(
+    @PreviewParameter(TaskScreenStatePreviewProvider::class) state: TaskScreenState,
+) {
+    AppTheme {
         TaskScreen(
             state = state,
-            onAction = {}
+            onActionTask = {}
         )
     }
 }
 
 @Composable
 @Preview(
-    uiMode = UI_MODE_NIGHT_YES
+    showBackground = true,
+    showSystemUi = true
 )
-fun TaskScreenDarkPreview(
-    @PreviewParameter(TaskScreenStatePreviewProvider::class) state: TaskScreenState
-){
-    TodoAppTheme {
+fun TaskScreenPreviewDark(
+    @PreviewParameter(TaskScreenStatePreviewProvider::class) state: TaskScreenState,
+) {
+    AppTheme {
         TaskScreen(
             state = state,
-            onAction = {}
+            onActionTask = {}
         )
     }
 }
+

@@ -7,9 +7,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.juandgaines.todoapp.domain.TaskLocalDataSource
-import com.juandgaines.todoapp.presentation.screens.home.HomeScreenAction.OnDeleteAllTasks
-import com.juandgaines.todoapp.presentation.screens.home.HomeScreenAction.OnDeleteTask
-import com.juandgaines.todoapp.presentation.screens.home.HomeScreenAction.OnToggleTask
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.launchIn
@@ -22,70 +19,61 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeScreenViewModel @Inject constructor(
-    private val savedStateHandle: SavedStateHandle,
+    savedStateHandle: SavedStateHandle,
     private val taskLocalDataSource: TaskLocalDataSource
-):ViewModel() {
+) : ViewModel() {
 
-    var state by   mutableStateOf(HomeDataState())
+    var state by mutableStateOf(HomeDataState())
         private set
-
     private val eventChannel = Channel<HomeScreenEvent>()
     val events = eventChannel.receiveAsFlow()
 
     init {
-
         state = state.copy(
             date = LocalDate.now().let {
-                DateTimeFormatter.ofPattern("EEEE, MMMM dd yyyy").format(it)
+                DateTimeFormatter.ofPattern("EEE, MMMM dd yyyy").format(it)
             }
         )
+        taskLocalDataSource.taskFlow
+            .onEach {
+                val completedTask =
+                    it.filter { task -> task.isCompleted }.sortedByDescending { it.date }
+                val pendingTask = it.filter { task -> !task.isCompleted }
+                    .sortedByDescending {
+                        it.date
+                    }
 
-        taskLocalDataSource.tasksFlow.onEach { tasks->
-
-            val completedTasks = tasks
-                .filter { task -> task.isCompleted }
-                .sortedByDescending { task ->
-                    task.date
-                }
-            val pendingTasks = tasks
-                .filter { task ->
-                    !task.isCompleted
-                }.sortedByDescending { task ->
-                    task.date
-                }
-
-            state = state.copy(
-                date = state.date,
-                summary = pendingTasks.size.toString(),
-                completedTask = completedTasks,
-                pendingTask = pendingTasks
-            )
-        }.launchIn(viewModelScope)
-
+                state = state.copy(
+                    summary = pendingTask.size.toString(),
+                    completedTasks = completedTask,
+                    pendingTasks = pendingTask
+                )
+            }
+            .launchIn(viewModelScope)
     }
 
-
-    fun onAction(action:HomeScreenAction){
+    fun onAction(action: HomeScreenAction) {
         viewModelScope.launch {
-            when(action){
-
-                is OnDeleteTask -> {
-                    taskLocalDataSource.removeTask(action.task)
-                    eventChannel.send(HomeScreenEvent.DeletedTask)
+            when (action) {
+                HomeScreenAction.OnDeleteAllTasks -> {
+                    taskLocalDataSource.deleteAllTasks()
+                    eventChannel.send(HomeScreenEvent.TaskAllDeleted)
                 }
-                is OnToggleTask -> {
-                    val updatedTask = action.task.copy(isCompleted = !action.task.isCompleted)
-                    taskLocalDataSource.updateTask(updatedTask)
+
+                is HomeScreenAction.OnDeleteTask -> {
+                    taskLocalDataSource.deleteTask(action.task)
+                    eventChannel.send(HomeScreenEvent.TaskDeleted)
+                }
+
+                is HomeScreenAction.OnToggleTask -> {
+                    val updateTask = action.task.copy(isCompleted = !action.task.isCompleted)
+                    taskLocalDataSource.updateTask(updateTask)
                     eventChannel.send(HomeScreenEvent.UpdatedTask)
                 }
 
-                OnDeleteAllTasks -> {
-                    taskLocalDataSource.removeAllTasks()
-                    eventChannel.send(HomeScreenEvent.AllTaskDeleted)
-                }
-
-                else-> Unit
+                else -> Unit
             }
         }
+
     }
 }

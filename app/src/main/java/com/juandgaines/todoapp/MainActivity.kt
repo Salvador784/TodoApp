@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.navigation.compose.rememberNavController
 import com.juandgaines.todoapp.presentation.navigation.NavigationRoot
-import com.juandgaines.todoapp.ui.theme.TodoAppTheme
+import com.juandgaines.todoapp.ui.theme.AppTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -15,11 +15,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            TodoAppTheme() {
+            AppTheme() {
                 val navController = rememberNavController()
-                NavigationRoot(navController)
+                NavigationRoot(navController = navController)
             }
         }
     }
 }
-
